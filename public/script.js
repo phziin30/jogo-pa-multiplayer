@@ -27,7 +27,7 @@ socket.on('connect', () => {
     myId = socket.id;
 });
 
-// Atualiza o estado visual do jogo (posiÁıes e turnos)
+// Atualiza o estado visual do jogo (posi√ß√µes e turnos)
 socket.on('updateGameState', (state) => {
     // Limpa todos os pinos do tabuleiro
     document.querySelectorAll('.player-token').forEach(token => token.remove());
@@ -36,15 +36,15 @@ socket.on('updateGameState', (state) => {
     btnQuestion.disabled = !isMyTurn;
 
     if (isMyTurn) {
-        turnIndicator.innerText = "… a tua vez! Pede uma pergunta.";
+        turnIndicator.innerText = "√â a tua vez! Pede uma pergunta.";
         turnIndicator.style.color = "green";
     } else {
-        turnIndicator.innerText = "Aguarda a vez do advers·rio...";
+        turnIndicator.innerText = "Aguarda a vez do advers√°rio...";
         turnIndicator.style.color = "red";
-        questionBox.classList.add('hidden'); // Esconde a pergunta se n„o for o turno
+        questionBox.classList.add('hidden'); // Esconde a pergunta se n√£o for o turno
     }
 
-    // Desenha os pinos nas novas posiÁıes
+    // Desenha os pinos nas novas posi√ß√µes
     Object.values(state.players).forEach(player => {
         const cell = document.getElementById(`cell-${player.pos}`);
         if (cell) {
@@ -63,7 +63,7 @@ btnQuestion.addEventListener('click', () => {
     btnQuestion.disabled = true;
 });
 
-// Receber a pergunta e mostrar no ecr„
+// Receber a pergunta e mostrar no ecr√£
 socket.on('question', (data) => {
     currentQuestion = data;
     questionText.innerText = data.text;
@@ -90,12 +90,12 @@ socket.on('turnResult', (data) => {
 
     if (data.isCorrect) {
         message = isMe 
-            ? `Acertaste! O dado rolou ${data.diceRoll} e avanÁaste no tabuleiro.` 
-            : `O advers·rio acertou e andou ${data.diceRoll} casas.`;
+            ? `Acertaste! O dado rolou ${data.diceRoll} e avan√ßaste no tabuleiro.` 
+            : `O advers√°rio acertou e andou ${data.diceRoll} casas.`;
     } else {
         message = isMe 
             ? `Erraste a pergunta de PA. Passaste a vez.` 
-            : `O advers·rio errou e passou a vez.`;
+            : `O advers√°rio errou e passou a vez.`;
     }
 
     const logMsg = document.createElement('p');
