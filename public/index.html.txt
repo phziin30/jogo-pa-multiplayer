@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>PA Ludo Multiplayer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <h1>PA Ludo Challenge</h1>
+        <div id="turn-indicator">Aguardando jogadores...</div>
+        
+        <div id="board">
+            </div>
+
+        <div id="controls">
+            <button id="btn-question">Pedir Pergunta</button>
+            <div id="question-box" class="hidden">
+                <p id="question-text"></p>
+                <input type="number" id="answer-input" placeholder="Resposta">
+                <button id="btn-submit">Enviar</button>
+            </div>
+        </div>
+        
+        <div id="log"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
