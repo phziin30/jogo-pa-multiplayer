@@ -1,4 +1,3 @@
- 
 const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -10,27 +9,58 @@ canvas.height = window.innerHeight;
 let myId = null;
 let gameState = { players: {}, foods: [] };
 let camera = { x: 0, y: 0 };
+let isConnected = false;
 
-socket.on('connect', () => { myId = socket.id; });
+// Controle de Conexão
+socket.on('connect', () => { 
+    myId = socket.id; 
+    isConnected = true;
+});
+
+socket.on('disconnect', () => {
+    isConnected = false;
+});
+
 socket.on('gameState', (state) => { gameState = state; });
 
-// Captura o rato e converte as coordenadas do ecrã para coordenadas do mundo
+// --- CONTROLES PARA PC (Mouse) ---
 canvas.addEventListener('mousemove', (e) => {
+    if (!isConnected) return;
     socket.emit('mouseMove', {
         x: e.clientX + camera.x,
         y: e.clientY + camera.y
     });
 });
 
-// Função para desenhar esferas 3D
+// --- CONTROLES PARA CELULAR (Touch) ---
+canvas.addEventListener('touchmove', (e) => {
+    if (!isConnected) return;
+    e.preventDefault(); // Evita que a tela role para baixo quando você arrasta o dedo
+    const touch = e.touches[0];
+    socket.emit('mouseMove', {
+        x: touch.clientX + camera.x,
+        y: touch.clientY + camera.y
+    });
+}, { passive: false });
+
+canvas.addEventListener('touchstart', (e) => {
+    if (!isConnected) return;
+    const touch = e.touches[0];
+    socket.emit('mouseMove', {
+        x: touch.clientX + camera.x,
+        y: touch.clientY + camera.y
+    });
+});
+
+// Função para desenhar esferas com efeito 3D
 function drawSphere(x, y, radius, colorBase) {
     const gradient = ctx.createRadialGradient(
-        x - radius * 0.3, y - radius * 0.3, radius * 0.1, // Ponto de luz (reflexo)
-        x, y, radius // Sombra nas bordas
+        x - radius * 0.3, y - radius * 0.3, radius * 0.1,
+        x, y, radius
     );
-    gradient.addColorStop(0, '#ffffff'); // Brilho branco puro
-    gradient.addColorStop(0.4, colorBase); // Cor principal
-    gradient.addColorStop(1, '#000000'); // Sombra preta
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(0.4, colorBase);
+    gradient.addColorStop(1, '#000000');
     
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -39,11 +69,20 @@ function drawSphere(x, y, radius, colorBase) {
     ctx.closePath();
 }
 
-// LOOP DE RENDERIZAÇÃO (Desenha o gráfico o mais rápido que o monitor permitir)
+// LOOP DE RENDERIZAÇÃO
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Se eu existir, a câmara centra-se em mim
+    // Feedback visual se o Render estiver acordando o servidor
+    if (!isConnected) {
+        ctx.fillStyle = '#00ffcc';
+        ctx.font = '18px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("Conectando ao servidor... (O Render pode levar 50s para acordar)", canvas.width/2, canvas.height/2);
+        requestAnimationFrame(draw);
+        return;
+    }
+
     const me = gameState.players[myId];
     if (me) {
         camera.x = me.x - canvas.width / 2;
@@ -51,31 +90,32 @@ function draw() {
         scoreEl.innerText = me.score;
     }
 
-    // Desenha uma grelha de fundo para dar sensação de movimento
-    ctx.strokeStyle = '#222';
-    ctx.lineWidth = 2;
-    const gridOffset = { x: camera.x % 50, y: camera.y % 50 };
+    // Grelha de fundo do mapa (Agora mais visível)
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    // Cálculo matemático correto para a grade não bugar quando for para a esquerda
+    const gridOffsetX = ((camera.x % 50) + 50) % 50;
+    const gridOffsetY = ((camera.y % 50) + 50) % 50;
+    
     for (let i = 0; i < canvas.width + 50; i += 50) {
         ctx.beginPath();
-        ctx.moveTo(i - gridOffset.x, 0);
-        ctx.lineTo(i - gridOffset.x, canvas.height);
+        ctx.moveTo(i - gridOffsetX, 0);
+        ctx.lineTo(i - gridOffsetX, canvas.height);
         ctx.stroke();
     }
     for (let i = 0; i < canvas.height + 50; i += 50) {
         ctx.beginPath();
-        ctx.moveTo(0, i - gridOffset.y);
-        ctx.lineTo(canvas.width, i - gridOffset.y);
+        ctx.moveTo(0, i - gridOffsetY);
+        ctx.lineTo(canvas.width, i - gridOffsetY);
         ctx.stroke();
     }
 
-    // Desenha as Comidas (Números)
+    // Desenha as Respostas (Comidas)
     gameState.foods.forEach(f => {
         const screenX = f.x - camera.x;
         const screenY = f.y - camera.y;
-        
         drawSphere(screenX, screenY, 15, f.color);
         
-        // Desenha o número no meio da esfera
         ctx.fillStyle = 'white';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
@@ -83,24 +123,22 @@ function draw() {
         ctx.fillText(f.value, screenX, screenY);
     });
 
-    // Desenha os Jogadores
+    // Desenha as Cobras dos Jogadores
     for (let id in gameState.players) {
         let p = gameState.players[id];
         
-        // 1. Desenha o Corpo (histórico de posições) de trás para a frente
+        // Desenha o corpo primeiro para ficar atrás da cabeça
         for (let i = p.history.length - 1; i >= 0; i -= 4) {
             const segment = p.history[i];
-            const screenX = segment.x - camera.x;
-            const screenY = segment.y - camera.y;
-            drawSphere(screenX, screenY, 18, p.color);
+            drawSphere(segment.x - camera.x, segment.y - camera.y, 18, p.color);
         }
 
-        // 2. Desenha a Cabeça
+        // Desenha a cabeça
         const headX = p.x - camera.x;
         const headY = p.y - camera.y;
         drawSphere(headX, headY, 22, p.color);
 
-        // 3. Desenha os "Olhos"
+        // Desenha os olhinhos
         ctx.fillStyle = 'white';
         ctx.beginPath(); ctx.arc(headX - 8, headY - 8, 5, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(headX + 8, headY - 8, 5, 0, Math.PI*2); ctx.fill();
@@ -108,21 +146,21 @@ function draw() {
         ctx.beginPath(); ctx.arc(headX - 8, headY - 8, 2, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(headX + 8, headY - 8, 2, 0, Math.PI*2); ctx.fill();
 
-        // 4. Desenha a Equação flutuando no corpo da cobra
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 20px Consolas';
-        ctx.textAlign = 'center';
-        ctx.shadowColor = 'black';
-        ctx.shadowBlur = 5;
-        // Coloca a fórmula acompanhando a cobra
-        ctx.fillText(p.equation.text, headX, headY + 40);
-        ctx.shadowBlur = 0; // Reseta a sombra para os próximos elementos
+        // Desenha a Equação de PA
+        if (p.equation) {
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 20px Consolas';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 5;
+            ctx.fillText(p.equation.text, headX, headY + 40);
+            ctx.shadowBlur = 0;
+        }
     }
 
     requestAnimationFrame(draw);
 }
 
-// Inicia o ciclo de renderização
 requestAnimationFrame(draw);
 
 window.addEventListener('resize', () => {
