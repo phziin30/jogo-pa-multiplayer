@@ -1,98 +1,49 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap');
 
+/* Reset básico e fundo escuro profundo */
 body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    background: #0d1117;
-    color: #c9d1d9;
-    display: flex;
-    justify-content: center;
-    padding: 20px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #050505; /* Fundo quase preto para destacar o neon */
+    font-family: 'Orbitron', sans-serif;
 }
 
-#game-container {
-    background: #161b22;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-    width: 650px;
-    text-align: center;
+/* O Canvas ocupa a tela toda */
+canvas {
+    display: block;
 }
 
-h1 { font-family: 'Orbitron', sans-serif; color: #58a6ff; text-transform: uppercase; }
-
-/* Tabuleiro com Imagem */
-#board {
-    display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    gap: 4px;
-    margin: 20px 0;
-    padding: 10px;
-    background-image: url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=800'); /* Fundo Tecnológico */
-    background-size: cover;
-    background-position: center;
-    border-radius: 8px;
-    border: 3px solid #30363d;
-}
-
-.cell {
-    width: 55px;
-    height: 55px;
-    background: rgba(13, 17, 23, 0.85); /* Fundo semi-transparente para ver a imagem atrás */
-    border: 1px solid #30363d;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    color: white;
-    border-radius: 6px;
-    position: relative;
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-}
-
-/* Casas com Prenda */
-.cell:nth-child(5n) {
-    background: rgba(218, 165, 32, 0.4);
-    border: 2px solid gold;
-    color: gold;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-}
-
-.player-token {
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
+/* Painel de Interface de Usuário (Placar flutuante) */
+#ui {
     position: absolute;
-    border: 2px solid white;
-    box-shadow: 0 0 10px currentColor;
-    transition: all 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28); /* Animação suave ao mover */
+    top: 20px;
+    left: 20px;
+    background: rgba(10, 15, 20, 0.85); /* Fundo escuro semi-transparente */
+    border: 2px solid #00ffcc; /* Borda neon ciano */
+    padding: 15px 25px;
+    border-radius: 12px;
+    color: #00ffcc;
+    font-size: 20px;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(0, 255, 204, 0.6);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+    
+    /* Isso é muito importante num jogo de canvas:
+       Faz com que o mouse "atravesse" a caixa do placar, 
+       permitindo que a cobra passe por baixo dele sem bugar o controle. */
+    pointer-events: none; 
     z-index: 10;
-}
-
-/* Animação do Dado */
-#dice-container {
-    background: rgba(0,0,0,0.8);
-    position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
+    
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-}
-#dice {
-    font-size: 80px;
-    background: white;
-    color: black;
-    width: 100px; height: 100px;
-    border-radius: 20px;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    transition: transform 0.1s;
+    gap: 5px;
 }
 
-.hidden { display: none !important; }
-button { padding: 12px 24px; cursor: pointer; background: #238636; color: white; border: none; border-radius: 6px; font-weight: bold; font-family: 'Orbitron', sans-serif;}
-button:disabled { background: #30363d; color: #8b949e; cursor: not-allowed; }
-#question-box { background: #21262d; padding: 20px; border-radius: 8px; margin-top: 15px; border: 1px solid #30363d;}
-input { padding: 10px; border-radius: 4px; border: 1px solid #30363d; background: #0d1117; color: white; margin-right: 10px; }
+/* O número do tamanho fica branco e com fonte de terminal */
+#ui span {
+    color: #ffffff;
+    font-family: Consolas, monospace;
+    font-size: 24px;
+    text-shadow: none;
+}
