@@ -9,81 +9,130 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Configurações do Mundo
+const WORLD_SIZE = 2000;
 let players = {};
-let turnOrder = [];
-let currentTurnIndex = 0;
+let foods = [];
 
-function generatePAQuestion() {
+// Função para gerar uma pergunta de PA
+function generateEquation() {
     const a1 = Math.floor(Math.random() * 10) + 1;
     const r = Math.floor(Math.random() * 5) + 1;
-    const n = Math.floor(Math.random() * 10) + 3;
+    const n = Math.floor(Math.random() * 8) + 3;
+    const answer = a1 + (n - 1) * r;
     return {
-        text: `Dada a PA onde a1 = ${a1} e r = ${r}, calcule a${n}:`,
-        answer: a1 + (n - 1) * r
+        text: `a₁=${a1} | r=${r} | a${n}=?`,
+        answer: answer
     };
 }
 
+// Inicializa o mapa com números aleatórios
+function spawnInitialFoods() {
+    for (let i = 0; i < 100; i++) {
+        foods.push({
+            id: Math.random().toString(),
+            x: Math.random() * WORLD_SIZE,
+            y: Math.random() * WORLD_SIZE,
+            value: Math.floor(Math.random() * 50) + 1,
+            color: `hsl(${Math.random() * 360}, 100%, 60%)`
+        });
+    }
+}
+spawnInitialFoods();
+
 io.on('connection', (socket) => {
+    const equation = generateEquation();
+    
     players[socket.id] = {
         id: socket.id,
-        pos: 0,
-        color: turnOrder.length === 0 ? '#ff0044' : '#00ddff', // Jogador 1 vermelho, Jogador 2 azul
-        name: `Jogador ${turnOrder.length + 1}`
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
+        targetX: 0,
+        targetY: 0,
+        color: `hsl(${Math.random() * 360}, 80%, 50%)`,
+        score: 5, // Tamanho inicial
+        history: [], // Guarda o rastro para desenhar o corpo
+        equation: equation
     };
-    turnOrder.push(socket.id);
 
-    io.emit('updateGameState', { players, turn: turnOrder[currentTurnIndex] });
+    // Garante que a resposta certa existe no mapa
+    spawnSpecificFood(equation.answer);
 
-    socket.on('requestQuestion', () => {
-        if (socket.id === turnOrder[currentTurnIndex]) {
-            socket.emit('question', generatePAQuestion());
+    socket.on('mouseMove', (data) => {
+        if (players[socket.id]) {
+            players[socket.id].targetX = data.x;
+            players[socket.id].targetY = data.y;
         }
-    });
-
-    socket.on('submitAnswer', (data) => {
-        if (socket.id !== turnOrder[currentTurnIndex]) return;
-
-        const isCorrect = parseInt(data.userAnswer) === data.correctAnswer;
-        let diceRoll = 0;
-        let bonusMessage = "";
-        let playAgain = false;
-
-        if (isCorrect) {
-            diceRoll = Math.floor(Math.random() * 6) + 1;
-            let tempPos = players[socket.id].pos + diceRoll;
-
-            // Lógica das Prendas (Casas 5, 10, 15, 20, 25)
-            if (tempPos === 5) { tempPos += 2; bonusMessage = "Gabaritou Álgebra Linear! Avance 2 casas."; }
-            else if (tempPos === 10) { tempPos -= 2; bonusMessage = "O servidor da UNIFOR caiu. Volte 2 casas."; }
-            else if (tempPos === 15) { playAgain = true; bonusMessage = "Otimizou o código! Jogue novamente."; }
-            else if (tempPos === 20) { tempPos -= 2; bonusMessage = "Deixou uma vulnerabilidade no sistema! Volte 2 casas."; }
-            else if (tempPos === 25) { tempPos += 2; bonusMessage = "Resolveu a integral de primeira! Avance 2 casas."; }
-
-            if (tempPos > 30) tempPos = 30;
-            players[socket.id].pos = tempPos;
-        }
-
-        // Passa a vez se errar ou se não tiver o bônus de jogar de novo
-        if (!isCorrect || !playAgain) {
-            currentTurnIndex = (currentTurnIndex + 1) % turnOrder.length;
-        }
-        
-        io.emit('turnResult', {
-            playerId: socket.id,
-            isCorrect,
-            diceRoll,
-            bonusMessage,
-            newPos: players[socket.id].pos,
-            nextTurn: turnOrder[currentTurnIndex]
-        });
     });
 
     socket.on('disconnect', () => {
-        turnOrder = turnOrder.filter(id => id !== socket.id);
         delete players[socket.id];
-        if (turnOrder.length > 0) currentTurnIndex = currentTurnIndex % turnOrder.length;
-        io.emit('updateGameState', { players, turn: turnOrder[currentTurnIndex] });
     });
 });
 
-server.listen(process.env.PORT || 3000);
+function spawnSpecificFood(value) {
+    foods.push({
+        id: Math.random().toString(),
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
+        value: value,
+        color: `hsl(${Math.random() * 360}, 100%, 60%)`
+    });
+}
+
+// GAME LOOP: Roda a 30 frames por segundo no servidor
+setInterval(() => {
+    for (let id in players) {
+        let p = players[id];
+        
+        // Lógica de Movimentação (Persegue o rato)
+        const dx = p.targetX - p.x;
+        const dy = p.targetY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 5) {
+            p.x += (dx / dist) * 6; // Velocidade da cobra
+            p.y += (dy / dist) * 6;
+        }
+
+        // Mantém a cobra dentro do mapa
+        p.x = Math.max(0, Math.min(WORLD_SIZE, p.x));
+        p.y = Math.max(0, Math.min(WORLD_SIZE, p.y));
+
+        // Guarda o histórico para o corpo da cobra
+        p.history.unshift({ x: p.x, y: p.y });
+        if (p.history.length > p.score * 4) {
+            p.history.pop();
+        }
+
+        // Colisão com a Comida
+        for (let i = foods.length - 1; i >= 0; i--) {
+            let f = foods[i];
+            let fDist = Math.sqrt(Math.pow(p.x - f.x, 2) + Math.pow(p.y - f.y, 2));
+            
+            if (fDist < 25) { // Raio de colisão
+                if (f.value === p.equation.answer) {
+                    p.score += 3; // Cresce se acertar
+                    p.equation = generateEquation(); // Nova fórmula!
+                    spawnSpecificFood(p.equation.answer); // Spawna a nova resposta
+                } else {
+                    p.score = Math.max(5, p.score - 1); // Encolhe se errar (mínimo 5)
+                }
+                
+                // Remove a comida comida e spawna uma nova aleatória
+                foods.splice(i, 1);
+                foods.push({
+                    id: Math.random().toString(),
+                    x: Math.random() * WORLD_SIZE,
+                    y: Math.random() * WORLD_SIZE,
+                    value: Math.floor(Math.random() * 60) + 1,
+                    color: `hsl(${Math.random() * 360}, 100%, 60%)`
+                });
+            }
+        }
+    }
+
+    io.emit('gameState', { players, foods });
+}, 1000 / 30);
+
+server.listen(process.env.PORT || 3000, () => console.log('Servidor Snake PA rodando...'));
