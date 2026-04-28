@@ -1,41 +1,18 @@
-
 <!DOCTYPE html>
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <title>PA Ludo - Edição Avançada</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Math Slither 3D</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 15px; left: 15px; color: #00ffcc; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00ffcc; pointer-events: none; }
+    </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <audio id="sfx-roll" src="assets/roll.mp3"></audio>
-    <audio id="sfx-correct" src="assets/correct.mp3"></audio>
-    <audio id="sfx-wrong" src="assets/wrong.mp3"></audio>
-    <audio id="sfx-move" src="assets/move.mp3"></audio>
-    <audio id="sfx-bonus" src="assets/bonus.mp3"></audio>
-
-    <div id="game-container">
-        <h1>Batalha de PA</h1>
-        <div id="turn-indicator">Aguardando adversário...</div>
-        
-        <div id="dice-container" class="hidden">
-            <div id="dice">🎲</div>
-            <p id="dice-result-text"></p>
-        </div>
-
-        <div id="board"></div>
-
-        <div id="controls">
-            <button id="btn-question">Rolar Dado (Pedir Pergunta)</button>
-            <div id="question-box" class="hidden">
-                <p id="question-text"></p>
-                <input type="number" id="answer-input" placeholder="Sua resposta">
-                <button id="btn-submit">Confirmar</button>
-            </div>
-        </div>
-        
-        <div id="log"></div>
-    </div>
+    <div id="ui">Tamanho: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
     <script src="script.js"></script>
 </body>
 </html>
