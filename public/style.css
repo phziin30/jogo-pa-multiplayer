@@ -1,24 +1,8 @@
-
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-    <meta charset="UTF-8">
-    <title>Math Slither UNIFOR</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
-</head>
-<body>
-    <div id="overlay">
-        <div id="login-box">
-            <h1>Math Slither 3D</h1>
-            <p>Estudante de Computação? Prove sua lógica!</p>
-            <input type="text" id="nick-input" placeholder="Seu Nickname" maxlength="15">
-            <button id="btn-play">JOGAR AGORA</button>
-        </div>
-    </div>
-
-    <div id="ui" class="hidden">Tamanho: <span id="score">0</span></div>
-    <canvas id="gameCanvas"></canvas>
-    <script src="script.js"></script>
-</body>
-</html>
+body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+#overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 100; }
+#login-box { background: #1a1a1a; padding: 30px; border-radius: 15px; border: 2px solid #00ffcc; text-align: center; color: white; }
+input { padding: 10px; border-radius: 5px; border: none; margin: 15px 0; width: 80%; display: block; margin-left: auto; margin-right: auto; }
+button { padding: 10px 30px; background: #00ffcc; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+.hidden { display: none !important; }
+#ui { position: absolute; top: 10px; left: 10px; color: #00ffcc; font-weight: bold; z-index: 5; }
+canvas { display: block; background: #050505; }
