@@ -9,54 +9,32 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configurações do Mundo
-const WORLD_SIZE = 2000;
+const WORLD_SIZE = 2500;
 let players = {};
 let foods = [];
 
-// Função para gerar uma pergunta de PA
 function generateEquation() {
     const a1 = Math.floor(Math.random() * 10) + 1;
     const r = Math.floor(Math.random() * 5) + 1;
     const n = Math.floor(Math.random() * 8) + 3;
-    const answer = a1 + (n - 1) * r;
-    return {
-        text: `a₁=${a1} | r=${r} | a${n}=?`,
-        answer: answer
-    };
+    return { text: `a₁=${a1}, r=${r}, a${n}=?`, answer: a1 + (n - 1) * r };
 }
-
-// Inicializa o mapa com números aleatórios
-function spawnInitialFoods() {
-    for (let i = 0; i < 100; i++) {
-        foods.push({
-            id: Math.random().toString(),
-            x: Math.random() * WORLD_SIZE,
-            y: Math.random() * WORLD_SIZE,
-            value: Math.floor(Math.random() * 50) + 1,
-            color: `hsl(${Math.random() * 360}, 100%, 60%)`
-        });
-    }
-}
-spawnInitialFoods();
 
 io.on('connection', (socket) => {
-    const equation = generateEquation();
-    
-    players[socket.id] = {
-        id: socket.id,
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
-        targetX: 0,
-        targetY: 0,
-        color: `hsl(${Math.random() * 360}, 80%, 50%)`,
-        score: 5, // Tamanho inicial
-        history: [], // Guarda o rastro para desenhar o corpo
-        equation: equation
-    };
-
-    // Garante que a resposta certa existe no mapa
-    spawnSpecificFood(equation.answer);
+    // O jogador só entra no jogo após enviar o nome
+    socket.on('joinGame', (nickname) => {
+        players[socket.id] = {
+            id: socket.id,
+            name: nickname || "Anônimo",
+            x: Math.random() * WORLD_SIZE,
+            y: Math.random() * WORLD_SIZE,
+            targetX: 0, targetY: 0,
+            color: `hsl(${Math.random() * 360}, 80%, 50%)`,
+            score: 5,
+            history: [],
+            equation: generateEquation()
+        };
+    });
 
     socket.on('mouseMove', (data) => {
         if (players[socket.id]) {
@@ -65,74 +43,63 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => {
-        delete players[socket.id];
-    });
+    socket.on('disconnect', () => { delete players[socket.id]; });
 });
 
-function spawnSpecificFood(value) {
-    foods.push({
-        id: Math.random().toString(),
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
-        value: value,
-        color: `hsl(${Math.random() * 360}, 100%, 60%)`
-    });
-}
-
-// GAME LOOP: Roda a 30 frames por segundo no servidor
+// Loop de Física e Colisões
 setInterval(() => {
-    for (let id in players) {
-        let p = players[id];
-        
-        // Lógica de Movimentação (Persegue o rato)
+    let playersArray = Object.values(players);
+
+    playersArray.forEach(p => {
+        // Movimentação
         const dx = p.targetX - p.x;
         const dy = p.targetY - p.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        
         if (dist > 5) {
-            p.x += (dx / dist) * 6; // Velocidade da cobra
-            p.y += (dy / dist) * 6;
+            p.x += (dx / dist) * 5;
+            p.y += (dy / dist) * 5;
         }
-
-        // Mantém a cobra dentro do mapa
-        p.x = Math.max(0, Math.min(WORLD_SIZE, p.x));
-        p.y = Math.max(0, Math.min(WORLD_SIZE, p.y));
-
-        // Guarda o histórico para o corpo da cobra
         p.history.unshift({ x: p.x, y: p.y });
-        if (p.history.length > p.score * 4) {
-            p.history.pop();
-        }
+        if (p.history.length > p.score * 4) p.history.pop();
 
-        // Colisão com a Comida
-        for (let i = foods.length - 1; i >= 0; i--) {
-            let f = foods[i];
-            let fDist = Math.sqrt(Math.pow(p.x - f.x, 2) + Math.pow(p.y - f.y, 2));
+        // 1. COLISÃO ENTRE COBRAS
+        playersArray.forEach(other => {
+            if (p.id === other.id) return; // Não colidir consigo mesmo
             
-            if (fDist < 25) { // Raio de colisão
-                if (f.value === p.equation.answer) {
-                    p.score += 3; // Cresce se acertar
-                    p.equation = generateEquation(); // Nova fórmula!
-                    spawnSpecificFood(p.equation.answer); // Spawna a nova resposta
-                } else {
-                    p.score = Math.max(5, p.score - 1); // Encolhe se errar (mínimo 5)
+            // Verifica se a cabeça de 'p' bateu em qualquer segmento do corpo de 'other'
+            other.history.forEach((segment, index) => {
+                if (index < 10) return; // Ignora os primeiros segmentos perto da cabeça
+                const d = Math.sqrt(Math.pow(p.x - segment.x, 2) + Math.pow(p.y - segment.y, 2));
+                if (d < 20) {
+                    // Se bater, o jogador 'p' morre (reseta)
+                    p.score = 5;
+                    p.x = Math.random() * WORLD_SIZE;
+                    p.y = Math.random() * WORLD_SIZE;
+                    p.history = [];
                 }
-                
-                // Remove a comida comida e spawna uma nova aleatória
-                foods.splice(i, 1);
+            });
+        });
+
+        // 2. COLISÃO COM COMIDA (Igual ao anterior)
+        foods.forEach((f, index) => {
+            const fDist = Math.sqrt(Math.pow(p.x - f.x, 2) + Math.pow(p.y - f.y, 2));
+            if (fDist < 30) {
+                if (f.value === p.equation.answer) {
+                    p.score += 2;
+                    p.equation = generateEquation();
+                } else {
+                    p.score = Math.max(5, p.score - 1);
+                }
+                foods.splice(index, 1);
                 foods.push({
-                    id: Math.random().toString(),
-                    x: Math.random() * WORLD_SIZE,
-                    y: Math.random() * WORLD_SIZE,
-                    value: Math.floor(Math.random() * 60) + 1,
-                    color: `hsl(${Math.random() * 360}, 100%, 60%)`
+                    id: Math.random(), x: Math.random() * WORLD_SIZE, y: Math.random() * WORLD_SIZE,
+                    value: Math.floor(Math.random() * 50), color: `hsl(${Math.random() * 360}, 100%, 50%)`
                 });
             }
-        }
-    }
+        });
+    });
 
     io.emit('gameState', { players, foods });
 }, 1000 / 30);
 
-server.listen(process.env.PORT || 3000, () => console.log('Servidor Snake PA rodando...'));
+server.listen(process.env.PORT || 3000);
