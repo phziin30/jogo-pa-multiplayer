@@ -1,17 +1,25 @@
+
+
 <!DOCTYPE html>
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Math Slither 3D</title>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        canvas { display: block; }
-        #ui { position: absolute; top: 15px; left: 15px; color: #00ffcc; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00ffcc; pointer-events: none; }
-    </style>
+    <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <div id="ui">Tamanho: <span id="score">0</span></div>
+    <div id="overlay">
+        <div id="login-box">
+            <h1>MATH SLITHER</h1>
+            <input type="text" id="nick-input" placeholder="Teu Nome" maxlength="10">
+            <button id="btn-play">JOGAR</button>
+            <p id="status-msg" style="font-size: 12px; color: #888; margin-top: 10px;">A ligar ao servidor...</p>
+        </div>
+    </div>
+
+    <div id="ui" class="hidden">Tamanho: <span id="score">5</span></div>
     <canvas id="gameCanvas"></canvas>
     <script src="script.js"></script>
 </body>
