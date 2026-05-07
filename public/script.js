@@ -11,24 +11,24 @@ let gameStarted = false;
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Diagnóstico de Conexão
 socket.on('connect', () => { 
     myId = socket.id; 
-    statusMsg.innerText = "Conectado! Digita o teu nome e joga.";
+    statusMsg.innerText = "Servidor Online! Escolha sua cor.";
     statusMsg.style.color = "#00ffcc";
 });
 
 document.getElementById('btn-play').addEventListener('click', () => {
     const nick = document.getElementById('nick-input').value || "Player";
-    socket.emit('joinGame', nick);
+    const color = document.getElementById('color-input').value;
+    socket.emit('joinGame', { name: nick, color: color });
     document.getElementById('overlay').classList.add('hidden');
     document.getElementById('ui').classList.remove('hidden');
+    document.getElementById('leaderboard').classList.remove('hidden');
     gameStarted = true;
 });
 
 socket.on('gameState', (state) => { gameState = state; });
 
-// Movimento (Mouse e Touch)
 const handleInput = (clientX, clientY) => {
     if (!gameStarted) return;
     socket.emit('mouseMove', { x: clientX + camera.x, y: clientY + camera.y });
@@ -45,6 +45,18 @@ function drawSphere(x, y, radius, color) {
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.fillStyle = grad; ctx.fill();
 }
 
+function updateLeaderboard() {
+    const list = document.getElementById('leaderboard-list');
+    list.innerHTML = '';
+    let arr = Object.values(gameState.players).sort((a, b) => b.score - a.score);
+    arr.slice(0, 5).forEach(p => {
+        const li = document.createElement('li');
+        li.innerText = `${p.name}: ${p.score}`;
+        if (p.id === myId) li.classList.add('my-rank');
+        list.appendChild(li);
+    });
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!gameStarted) { requestAnimationFrame(draw); return; }
@@ -55,26 +67,34 @@ function draw() {
         camera.y = me.y - canvas.height / 2;
         document.getElementById('score').innerText = me.score;
     }
+    updateLeaderboard();
 
-    // Comidas
+    ctx.strokeStyle = '#1a1a1a';
+    const ox = ((camera.x % 50) + 50) % 50;
+    const oy = ((camera.y % 50) + 50) % 50;
+    for (let i = 0; i < canvas.width + 50; i += 50) {
+        ctx.beginPath(); ctx.moveTo(i - ox, 0); ctx.lineTo(i - ox, canvas.height); ctx.stroke();
+    }
+    for (let i = 0; i < canvas.height + 50; i += 50) {
+        ctx.beginPath(); ctx.moveTo(0, i - oy); ctx.lineTo(canvas.width, i - oy); ctx.stroke();
+    }
+
     gameState.foods.forEach(f => {
         const sx = f.x - camera.x; const sy = f.y - camera.y;
         drawSphere(sx, sy, 12, f.color);
-        ctx.fillStyle = "white"; ctx.font = "14px Arial"; ctx.fillText(f.value, sx + 15, sy - 15);
+        ctx.fillStyle = "white"; ctx.font = "bold 16px Arial"; ctx.fillText(f.value, sx + 20, sy - 10);
     });
 
-    // Jogadores
     for (let id in gameState.players) {
-        let p = gameState.players[id];
-        p.history.forEach((seg, i) => {
-            if (i % 4 === 0) drawSphere(seg.x - camera.x, seg.y - camera.y, 18, p.color);
-        });
+        const p = gameState.players[id];
+        p.history.forEach((seg, i) => { if (i % 4 === 0) drawSphere(seg.x - camera.x, seg.y - camera.y, 18, p.color); });
         const hx = p.x - camera.x; const hy = p.y - camera.y;
         drawSphere(hx, hy, 22, p.color);
-        ctx.fillStyle = "white"; ctx.textAlign = "center";
+        ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "bold 14px Rajdhani";
         ctx.fillText(p.name, hx, hy - 35);
-        if(p.equation) ctx.fillText(p.equation.text, hx, hy + 45);
+        if(p.equation) { ctx.fillStyle = "#00ffcc"; ctx.fillText(p.equation.text, hx, hy + 45); }
     }
     requestAnimationFrame(draw);
 }
 draw();
+window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
