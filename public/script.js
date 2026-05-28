@@ -1,163 +1,161 @@
-const socket = io();
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const statusMsg = document.getElementById('status-msg');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
 
-let myId = null;
-let gameState = { players: {}, foods: [] };
-let camera = { x: 0, y: 0 };
-let gameStarted = false;
-let particles = [];
-let screenShake = 0;
-let currentCombo = 0;
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+app.use(express.static(path.join(__dirname, 'public')));
 
-// --- WEB AUDIO API (Sons Procedurais) ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playTone(freq, type, duration, vol) {
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + duration);
-}
+const WORLD_SIZE = 2500;
+let players = {};
+let foods = [];
 
-socket.on('connect', () => { 
-    myId = socket.id; 
-    statusMsg.innerText = "Sistemas Online. Bem-vindo à Arena.";
-    statusMsg.style.color = "#00ffcc";
-});
-
-document.getElementById('btn-play').addEventListener('click', () => {
-    const nick = document.getElementById('nick-input').value || "Player";
-    const color = document.getElementById('color-input').value;
-    const diff = document.getElementById('difficulty-input').value;
-    socket.emit('joinGame', { name: nick, color: color, difficulty: diff });
-    document.getElementById('overlay').classList.add('hidden');
-    document.getElementById('ui').classList.remove('hidden');
-    document.getElementById('leaderboard').classList.remove('hidden');
-    gameStarted = true;
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-});
-
-socket.on('gameState', (state) => { gameState = state; });
-
-socket.on('eatSuccess', (data) => {
-    currentCombo = data.combo;
-    screenShake = Math.min(25, 10 + data.combo * 2);
-    playTone(400 + (data.combo * 60), 'sine', 0.3, 0.4);
-    for(let i=0; i < 15; i++){
-        particles.push({
-            x: data.x, y: data.y, life: 1.0, color: data.color,
-            vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15
-        });
-    }
-});
-
-socket.on('eatFail', () => {
-    currentCombo = 0; screenShake = 20;
-    playTone(120, 'sawtooth', 0.4, 0.6);
-});
-
-const handleInput = (clientX, clientY) => {
-    if (!gameStarted) return;
-    socket.emit('mouseMove', { x: clientX + camera.x, y: clientY + camera.y });
-};
-canvas.addEventListener('mousemove', (e) => handleInput(e.clientX, e.clientY));
-canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault(); handleInput(e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
-
-function drawSphere(x, y, radius, color) {
-    const grad = ctx.createRadialGradient(x-radius*0.3, y-radius*0.3, radius*0.1, x, y, radius);
-    grad.addColorStop(0, '#fff'); grad.addColorStop(0.4, color); grad.addColorStop(1, '#000');
-    ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.fillStyle = grad; ctx.fill();
-}
-
-function draw() {
-    ctx.save();
-    if (screenShake > 0) {
-        ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
-        screenShake *= 0.85;
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!gameStarted) { ctx.restore(); requestAnimationFrame(draw); return; }
-
-    const me = gameState.players[myId];
-    if (me) {
-        camera.x = me.x - canvas.width / 2;
-        camera.y = me.y - canvas.height / 2;
-        document.getElementById('score').innerText = me.score;
-    }
-
-    // Grid de Fundo
-    ctx.strokeStyle = '#111';
-    const ox = ((camera.x % 60) + 60) % 60;
-    const oy = ((camera.y % 60) + 60) % 60;
-    for (let i = 0; i < canvas.width + 60; i += 60) {
-        ctx.beginPath(); ctx.moveTo(i-ox, 0); ctx.lineTo(i-ox, canvas.height); ctx.stroke();
-    }
-    for (let i = 0; i < canvas.height + 60; i += 60) {
-        ctx.beginPath(); ctx.moveTo(0, i-oy); ctx.lineTo(canvas.width, i-oy); ctx.stroke();
-    }
-
-    // Comidas
-    gameState.foods.forEach(f => {
-        const sx = f.x - camera.x; const sy = f.y - camera.y;
-        if(sx > -50 && sx < canvas.width+50 && sy > -50 && sy < canvas.height+50) {
-            drawSphere(sx, sy, 12, f.color);
-            ctx.fillStyle = "white"; ctx.font = "bold 16px Arial"; ctx.fillText(f.value, sx + 20, sy - 10);
+// FUNÇÃO PARA ATUALIZAR A EQUAÇÃO DO JOGADOR
+function updatePlayerEquation(p) {
+    // Calcula a resposta atual baseada no 'n' que o jogador está
+    let ans = p.seq.a1 + (p.seq.n - 1) * p.seq.r;
+    
+    if (p.difficulty === 'easy') {
+        // MODO FÁCIL: Mostra a sequência visualmente! Ex: "2, 5, 8, 11, ?"
+        let seqText = "";
+        // Pega os 3 números anteriores para mostrar ao jogador
+        let startDisplay = Math.max(1, p.seq.n - 3); 
+        for(let i = startDisplay; i < p.seq.n; i++) {
+            seqText += (p.seq.a1 + (i - 1) * p.seq.r) + ", ";
         }
-    });
-
-    // Partículas
-    for(let i = particles.length - 1; i >= 0; i--) {
-        let p = particles[i];
-        p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-        if(p.life <= 0) { particles.splice(i, 1); continue; }
-        ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x - camera.x, p.y - camera.y, 4, 0, Math.PI*2); ctx.fill();
+        p.equation = { text: seqText + "?", answer: ans };
+    } else {
+        // MODO MÉDIO/DIFÍCIL: Mantém a fórmula abstrata para forçar a conta de cabeça
+        p.equation = { text: `a₁=${p.seq.a1}, r=${p.seq.r}, a${p.seq.n}=?`, answer: ans };
     }
-    ctx.globalAlpha = 1.0;
+}
 
-    // Jogadores
-    for (let id in gameState.players) {
-        const p = gameState.players[id];
-        p.history.forEach((seg, i) => { if (i % 4 === 0) drawSphere(seg.x-camera.x, seg.y-camera.y, 18, p.color); });
-        const hx = p.x-camera.x; const hy = p.y-camera.y;
-        drawSphere(hx, hy, 22, p.color);
+function spawnFood(specificValue = null) {
+    foods.push({
+        id: Math.random().toString(),
+        x: Math.random() * WORLD_SIZE,
+        y: Math.random() * WORLD_SIZE,
+        value: specificValue !== null ? specificValue : Math.floor(Math.random() * 120) + 1,
+        color: `hsl(${Math.random() * 360}, 100%, 60%)`
+    });
+}
+
+// Inicializa com 96 bolinhas
+for (let i = 0; i < 96; i++) { spawnFood(); }
+
+io.on('connection', (socket) => {
+    socket.on('joinGame', (data) => {
+        const startX = Math.random() * WORLD_SIZE;
+        const startY = Math.random() * WORLD_SIZE;
+        const diff = data.difficulty || 'medium';
         
-        if (id === myId && p.combo > 1) {
-            ctx.fillStyle = "#ff00cc"; ctx.font = "bold 22px Orbitron"; ctx.textAlign="center";
-            ctx.fillText(`${p.combo}x COMBO!`, hx, hy - 70);
+        // Sorteia a PA do jogador APENAS UMA VEZ
+        let a1, r;
+        if (diff === 'easy') {
+            a1 = Math.floor(Math.random() * 3) + 1;
+            r = Math.floor(Math.random() * 3) + 1; // Pulos de 1 a 3
+        } else if (diff === 'hard') {
+            a1 = Math.floor(Math.random() * 20) + 10;
+            r = Math.floor(Math.random() * 8) + 5; // Pulos grandes
+        } else {
+            a1 = Math.floor(Math.random() * 10) + 1;
+            r = Math.floor(Math.random() * 4) + 2; 
         }
-
-        ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "bold 15px Rajdhani";
-        ctx.fillText(p.name, hx, hy - 40);
-        if(p.equation) { 
-            ctx.fillStyle = "#00ffcc"; ctx.font = "16px Orbitron";
-            ctx.fillText(p.equation.text, hx, hy + 50); 
-        }
-    }
-
-    // Atualiza Ranking Lateral
-    const list = document.getElementById('leaderboard-list');
-    list.innerHTML = '';
-    Object.values(gameState.players).sort((a,b)=>b.score-a.score).slice(0,5).forEach(p => {
-        const li = document.createElement('li');
-        li.innerText = `${p.name}: ${p.score}`;
-        if(p.id === myId) li.className = 'my-rank';
-        list.appendChild(li);
+        
+        players[socket.id] = {
+            id: socket.id,
+            name: data.name || "Player",
+            color: data.color || "#00ffcc",
+            difficulty: diff,
+            x: startX, y: startY, targetX: startX, targetY: startY,
+            score: 5, history: [], combo: 0, lastEatTime: 0,
+            seq: { a1: a1, r: r, n: 4 } // A cobra começa procurando a 4ª posição da sequência
+        };
+        
+        // Gera o texto e a resposta inicial
+        updatePlayerEquation(players[socket.id]);
+        spawnFood(players[socket.id].equation.answer);
     });
 
-    ctx.restore();
-    requestAnimationFrame(draw);
-}
-draw();
-window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    socket.on('mouseMove', (data) => {
+        if (players[socket.id] && typeof data.x === 'number') {
+            players[socket.id].targetX = data.x;
+            players[socket.id].targetY = data.y;
+        }
+    });
+
+    socket.on('disconnect', () => { delete players[socket.id]; });
+});
+
+setInterval(() => {
+    let playersArray = Object.values(players);
+    const now = Date.now();
+
+    playersArray.forEach(p => {
+        const dx = p.targetX - p.x; const dy = p.targetY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        let speed = 7 + (p.combo * 0.2); 
+        if (speed > 12) speed = 12;
+
+        if (dist > 5) { p.x += (dx / dist) * speed; p.y += (dy / dist) * speed; }
+        
+        p.x = Math.max(0, Math.min(WORLD_SIZE, p.x));
+        p.y = Math.max(0, Math.min(WORLD_SIZE, p.y));
+        p.history.unshift({ x: p.x, y: p.y });
+        if (p.history.length > p.score * 4) p.history.pop();
+
+        if (now - p.lastEatTime > 6000 && p.combo > 0) p.combo = 0;
+
+        // Colisão com outras cobras
+        playersArray.forEach(other => {
+            if (p.id === other.id) return;
+            other.history.forEach((seg, idx) => {
+                if (idx < 10) return;
+                if (Math.sqrt(Math.pow(p.x - seg.x, 2) + Math.pow(p.y - seg.y, 2)) < 22) {
+                    p.score = 5; p.combo = 0;
+                    p.seq.n = 4; // Se morrer, volta para a 4ª posição da sequência
+                    p.x = Math.random() * WORLD_SIZE; p.y = Math.random() * WORLD_SIZE;
+                    p.history = []; p.targetX = p.x; p.targetY = p.y;
+                    
+                    updatePlayerEquation(p);
+                    io.to(p.id).emit('eatFail'); 
+                }
+            });
+        });
+
+        // Colisão com as bolinhas numéricas
+        for (let i = foods.length - 1; i >= 0; i--) {
+            const f = foods[i];
+            if (Math.sqrt(Math.pow(p.x - f.x, 2) + Math.pow(p.y - f.y, 2)) < 30) {
+                if (f.value === p.equation.answer) {
+                    p.combo++;
+                    p.lastEatTime = now;
+                    
+                    let points = 1;
+                    if (p.difficulty === 'medium') points = 2;
+                    if (p.difficulty === 'hard') points = 4;
+                    
+                    p.score += points + Math.floor(p.combo / 3);
+                    
+                    // AVANÇA NA PROGRESSÃO ARITMÉTICA!
+                    p.seq.n++; 
+                    updatePlayerEquation(p);
+                    
+                    io.to(p.id).emit('eatSuccess', { x: f.x, y: f.y, color: f.color, combo: p.combo });
+                    spawnFood(p.equation.answer);
+                } else { 
+                    p.score = Math.max(5, p.score - 1); p.combo = 0;
+                    io.to(p.id).emit('eatFail');
+                }
+                foods.splice(i, 1); spawnFood();
+            }
+        }
+    });
+    io.emit('gameState', { players, foods });
+}, 1000 / 30);
+
+server.listen(process.env.PORT || 3000);
