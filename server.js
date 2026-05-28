@@ -13,10 +13,22 @@ const WORLD_SIZE = 2500;
 let players = {};
 let foods = [];
 
-function generateEquation() {
-    const a1 = Math.floor(Math.random() * 10) + 1;
-    const r = Math.floor(Math.random() * 5) + 1;
-    const n = Math.floor(Math.random() * 8) + 3;
+// MOTOR MATEMÁTICO COM DIFICULDADE
+function generateEquation(diff) {
+    let a1, r, n;
+    if (diff === 'easy') {
+        a1 = Math.floor(Math.random() * 5) + 1;
+        r = Math.floor(Math.random() * 2) + 1;
+        n = Math.floor(Math.random() * 3) + 3; // Posição 3 a 5
+    } else if (diff === 'hard') {
+        a1 = Math.floor(Math.random() * 20) + 10;
+        r = Math.floor(Math.random() * 8) + 5;
+        n = Math.floor(Math.random() * 7) + 6; // Posição 6 a 12
+    } else { // medium (padrão)
+        a1 = Math.floor(Math.random() * 10) + 1;
+        r = Math.floor(Math.random() * 5) + 1;
+        n = Math.floor(Math.random() * 5) + 3;
+    }
     return { text: `a₁=${a1}, r=${r}, a${n}=?`, answer: a1 + (n - 1) * r };
 }
 
@@ -24,7 +36,7 @@ function spawnFood(specificValue = null) {
     foods.push({
         id: Math.random().toString(),
         x: Math.random() * WORLD_SIZE, y: Math.random() * WORLD_SIZE,
-        value: specificValue !== null ? specificValue : Math.floor(Math.random() * 60) + 1,
+        value: specificValue !== null ? specificValue : Math.floor(Math.random() * 100) + 1,
         color: `hsl(${Math.random() * 360}, 100%, 60%)`
     });
 }
@@ -35,14 +47,16 @@ io.on('connection', (socket) => {
     socket.on('joinGame', (data) => {
         const startX = Math.random() * WORLD_SIZE;
         const startY = Math.random() * WORLD_SIZE;
-        const eq = generateEquation();
+        const diff = data.difficulty || 'medium';
+        const eq = generateEquation(diff);
+        
         players[socket.id] = {
             id: socket.id,
             name: data.name || "Player",
             color: data.color || "#00ffcc",
+            difficulty: diff,
             x: startX, y: startY, targetX: startX, targetY: startY,
-            score: 5, history: [], equation: eq,
-            combo: 0, lastEatTime: 0 // NOVO: Sistema de Combo
+            score: 5, history: [], equation: eq, combo: 0, lastEatTime: 0
         };
         spawnFood(eq.answer);
     });
@@ -53,7 +67,6 @@ io.on('connection', (socket) => {
             players[socket.id].targetY = data.y;
         }
     });
-
     socket.on('disconnect', () => { delete players[socket.id]; });
 });
 
@@ -64,57 +77,32 @@ setInterval(() => {
     playersArray.forEach(p => {
         const dx = p.targetX - p.x; const dy = p.targetY - p.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        // Aumenta a velocidade se o combo estiver alto!
         let speed = 7 + (p.combo * 0.2); 
-        if (speed > 12) speed = 12; // Limite de velocidade
-
         if (dist > 5) { p.x += (dx / dist) * speed; p.y += (dy / dist) * speed; }
-        
         p.x = Math.max(0, Math.min(WORLD_SIZE, p.x));
         p.y = Math.max(0, Math.min(WORLD_SIZE, p.y));
         p.history.unshift({ x: p.x, y: p.y });
         if (p.history.length > p.score * 4) p.history.pop();
 
-        // Quebra o combo se demorar muito (mais de 6 segundos)
-        if (now - p.lastEatTime > 6000 && p.combo > 0) {
-            p.combo = 0;
-            io.to(p.id).emit('comboBreak');
-        }
-
-        // Colisão com Cobras
-        playersArray.forEach(other => {
-            if (p.id === other.id) return;
-            other.history.forEach((seg, idx) => {
-                if (idx < 10) return;
-                if (Math.sqrt(Math.pow(p.x - seg.x, 2) + Math.pow(p.y - seg.y, 2)) < 20) {
-                    p.score = 5; p.combo = 0;
-                    p.x = Math.random() * WORLD_SIZE; p.y = Math.random() * WORLD_SIZE;
-                    p.history = []; p.targetX = p.x; p.targetY = p.y;
-                    io.to(p.id).emit('eatFail'); // Toca som de morte
-                }
-            });
-        });
-
-        // Colisão com Comida
+        // Colisões e Pontuação Diferenciada
         for (let i = foods.length - 1; i >= 0; i--) {
             const f = foods[i];
             if (Math.sqrt(Math.pow(p.x - f.x, 2) + Math.pow(p.y - f.y, 2)) < 30) {
                 if (f.value === p.equation.answer) {
-                    // SISTEMA DE COMBO
-                    p.combo++;
-                    p.lastEatTime = now;
-                    p.score += 2 + Math.floor(p.combo / 3); // Bônus de combo
+                    p.combo++; p.lastEatTime = now;
                     
-                    // Envia evento de sucesso apenas para o jogador que comeu (Partículas, Som e Shake)
+                    // LÓGICA DE PONTOS POR DIFICULDADE
+                    let points = 1;
+                    if (p.difficulty === 'medium') points = 2;
+                    if (p.difficulty === 'hard') points = 4;
+                    
+                    p.score += points + Math.floor(p.combo / 3);
                     io.to(p.id).emit('eatSuccess', { x: f.x, y: f.y, color: f.color, combo: p.combo });
-                    
-                    p.equation = generateEquation(); 
+                    p.equation = generateEquation(p.difficulty); 
                     spawnFood(p.equation.answer);
                 } else { 
-                    p.score = Math.max(5, p.score - 1); 
-                    p.combo = 0;
-                    io.to(p.id).emit('eatFail'); // Errou a conta
+                    p.score = Math.max(5, p.score - 1); p.combo = 0;
+                    io.to(p.id).emit('eatFail');
                 }
                 foods.splice(i, 1); spawnFood();
             }
