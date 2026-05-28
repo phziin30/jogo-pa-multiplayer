@@ -1,32 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@500;700&display=swap');
 
 body { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: 'Rajdhani', sans-serif; }
-#overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(10,20,30,0.8) 0%, #000 100%); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100; }
-#login-box { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 255, 204, 0.3); padding: 40px; width: 320px; text-align: center; color: white; border-radius: 15px; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
-h1 { font-family: 'Orbitron', sans-serif; color: #00ffcc; letter-spacing: 3px; margin: 0; text-shadow: 0 0 10px #00ffcc; }
-.line { height: 2px; background: linear-gradient(90deg, transparent, #00ffcc, transparent); margin: 20px 0; }
-.input-group { text-align: left; margin-bottom: 15px; }
-label { font-size: 11px; color: #00ffcc; letter-spacing: 2px; }
-input { background: #000; border: 1px solid #333; color: white; padding: 10px; width: 100%; box-sizing: border-box; border-radius: 5px; margin-top: 5px; }
-#color-input { height: 40px; cursor: pointer; padding: 2px; }
-button { width: 100%; padding: 15px; background: #00ffcc; border: none; font-family: 'Orbitron', sans-serif; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 255, 204, 0.5); }
-#ui { position: absolute; top: 20px; left: 20px; color: #00ffcc; font-weight: bold; z-index: 10; font-family: 'Orbitron'; }
-#leaderboard { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); border: 1px solid #00ffcc; padding: 15px; border-radius: 10px; color: white; width: 180px; z-index: 10; }
-#leaderboard h3 { margin: 0 0 10px 0; font-size: 14px; color: #00ffcc; border-bottom: 1px solid #00ffcc33; }
-#leaderboard ol { padding-left: 20px; margin: 0; font-size: 13px; }
-.my-rank { color: #00ffcc; font-weight: bold; }
+#overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(10,20,30,0.8) 0%, #000 100%); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 100; }
+#login-box { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 255, 204, 0.3); padding: 40px; width: 340px; text-align: center; color: white; border-radius: 20px; box-shadow: 0 0 40px rgba(0,0,0,0.7); }
+#main-logo { font-family: 'Orbitron', sans-serif; color: #00ffcc; letter-spacing: 4px; margin: 0; text-shadow: 0 0 15px #00ffcc; }
+.line { height: 2px; background: linear-gradient(90deg, transparent, #00ffcc, transparent); margin: 25px 0; }
+.input-group { text-align: left; margin-bottom: 20px; }
+label { font-size: 11px; color: #00ffcc; letter-spacing: 2px; font-weight: bold; }
+input, select { background: rgba(0,0,0,0.6); border: 1px solid #333; color: white; padding: 12px; width: 100%; box-sizing: border-box; border-radius: 8px; margin-top: 5px; font-family: 'Rajdhani'; font-size: 16px; }
+#color-input { height: 45px; cursor: pointer; padding: 5px; }
+button { width: 100%; padding: 18px; background: #00ffcc; border: none; font-family: 'Orbitron', sans-serif; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; border-radius: 8px; font-size: 16px; box-shadow: 0 0 15px rgba(0,255,204,0.3); }
+button:hover { transform: scale(1.03); box-shadow: 0 0 25px rgba(0, 255, 204, 0.6); }
+#ui { position: absolute; top: 25px; left: 25px; color: #00ffcc; font-weight: bold; z-index: 10; font-family: 'Orbitron'; font-size: 20px; }
+#leaderboard { position: absolute; top: 25px; right: 25px; background: rgba(0,0,0,0.8); border: 1px solid rgba(0, 255, 204, 0.4); padding: 20px; border-radius: 12px; color: white; width: 200px; z-index: 10; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+#leaderboard h3 { margin: 0 0 15px 0; font-size: 14px; color: #00ffcc; text-align: center; border-bottom: 1px solid #00ffcc33; padding-bottom: 8px; font-family: 'Orbitron'; }
+#leaderboard ol { padding-left: 25px; margin: 0; font-size: 15px; }
+#leaderboard li { margin-bottom: 10px; }
+.my-rank { color: #00ffcc; font-weight: bold; text-shadow: 0 0 5px #00ffcc; }
 .hidden { display: none !important; }
-select {
-    background: #000;
-    border: 1px solid #333;
-    color: #00ffcc;
-    padding: 10px;
-    width: 100%;
-    border-radius: 5px;
-    margin-top: 5px;
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: bold;
-    cursor: pointer;
-}
-
