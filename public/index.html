@@ -1,38 +1,28 @@
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Math Slither 3D</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
-</head>
-<body>
-    <div id="overlay">
-        <div id="login-box">
-            <h1>MATH SLITHER</h1>
-            <div class="line"></div>
-            <div class="input-group">
-                <label>NICKNAME</label>
-                <input type="text" id="nick-input" placeholder="Teu Nome" maxlength="12">
-            </div>
-            <div class="input-group">
-                <label>COR DA COBRA</label>
-                <input type="color" id="color-input" value="#00ffcc">
-            </div>
-            <button id="btn-play">ENTRAR NA ARENA</button>
-            <p id="status-msg">A ligar ao servidor...</p>
+<div id="overlay">
+    <div id="login-box">
+        <h1>MATH SLITHER</h1>
+        <div class="line"></div>
+        
+        <div class="input-group">
+            <label>NICKNAME</label>
+            <input type="text" id="nick-input" placeholder="Teu Nome" maxlength="12">
         </div>
-    </div>
 
-    <div id="ui" class="hidden">Tamanho: <span id="score">5</span></div>
-    
-    <div id="leaderboard" class="hidden">
-        <h3>🏆 TOP 5 RANKING</h3>
-        <ol id="leaderboard-list"></ol>
-    </div>
+        <div class="input-group">
+            <label>DIFICULDADE (MULT. PONTOS)</label>
+            <select id="difficulty-input">
+                <option value="easy">FÁCIL (1x pts)</option>
+                <option value="medium" selected>MÉDIO (2x pts)</option>
+                <option value="hard">DIFÍCIL (4x pts)</option>
+            </select>
+        </div>
 
-    <canvas id="gameCanvas"></canvas>
-    <script src="script.js"></script>
-</body>
-</html>
+        <div class="input-group">
+            <label>COR DA COBRA</label>
+            <input type="color" id="color-input" value="#00ffcc">
+        </div>
+
+        <button id="btn-play">ENTRAR NA ARENA</button>
+        <p id="status-msg">A ligar ao servidor...</p>
+    </div>
+</div>
