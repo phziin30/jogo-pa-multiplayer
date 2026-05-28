@@ -17,3 +17,16 @@ button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 255, 204, 0.
 #leaderboard ol { padding-left: 20px; margin: 0; font-size: 13px; }
 .my-rank { color: #00ffcc; font-weight: bold; }
 .hidden { display: none !important; }
+select {
+    background: #000;
+    border: 1px solid #333;
+    color: #00ffcc;
+    padding: 10px;
+    width: 100%;
+    border-radius: 5px;
+    margin-top: 5px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: bold;
+    cursor: pointer;
+}
+
