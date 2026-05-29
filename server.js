@@ -13,23 +13,24 @@ const WORLD_SIZE = 2500;
 let players = {};
 let foods = [];
 
-// MOTOR MATEMÁTICO COM DIFICULDADE (Risco vs Recompensa)
-function generateEquation(diff) {
-    let a1, r, n;
-    if (diff === 'easy') {
-        a1 = Math.floor(Math.random() * 5) + 1;
-        r = Math.floor(Math.random() * 2) + 1;
-        n = Math.floor(Math.random() * 3) + 3; 
-    } else if (diff === 'hard') {
-        a1 = Math.floor(Math.random() * 20) + 15;
-        r = Math.floor(Math.random() * 8) + 5;
-        n = Math.floor(Math.random() * 6) + 7; 
-    } else { // medium
-        a1 = Math.floor(Math.random() * 10) + 1;
-        r = Math.floor(Math.random() * 5) + 1;
-        n = Math.floor(Math.random() * 5) + 3;
+// FUNÇÃO PARA ATUALIZAR A EQUAÇÃO DO JOGADOR
+function updatePlayerEquation(p) {
+    // Calcula a resposta atual baseada no 'n' que o jogador está
+    let ans = p.seq.a1 + (p.seq.n - 1) * p.seq.r;
+    
+    if (p.difficulty === 'easy') {
+        // MODO FÁCIL: Mostra a sequência visualmente! Ex: "2, 5, 8, 11, ?"
+        let seqText = "";
+        // Pega os 3 números anteriores para mostrar ao jogador
+        let startDisplay = Math.max(1, p.seq.n - 3); 
+        for(let i = startDisplay; i < p.seq.n; i++) {
+            seqText += (p.seq.a1 + (i - 1) * p.seq.r) + ", ";
+        }
+        p.equation = { text: seqText + "?", answer: ans };
+    } else {
+        // MODO MÉDIO/DIFÍCIL: Mantém a fórmula abstrata para forçar a conta de cabeça
+        p.equation = { text: `a₁=${p.seq.a1}, r=${p.seq.r}, a${p.seq.n}=?`, answer: ans };
     }
-    return { text: `a₁=${a1}, r=${r}, a${n}=?`, answer: a1 + (n - 1) * r };
 }
 
 function spawnFood(specificValue = null) {
@@ -42,7 +43,7 @@ function spawnFood(specificValue = null) {
     });
 }
 
-// Inicializa com 96 bolinhas (80 + 20%)
+// Inicializa com 96 bolinhas
 for (let i = 0; i < 96; i++) { spawnFood(); }
 
 io.on('connection', (socket) => {
@@ -50,7 +51,19 @@ io.on('connection', (socket) => {
         const startX = Math.random() * WORLD_SIZE;
         const startY = Math.random() * WORLD_SIZE;
         const diff = data.difficulty || 'medium';
-        const eq = generateEquation(diff);
+        
+        // Sorteia a PA do jogador APENAS UMA VEZ
+        let a1, r;
+        if (diff === 'easy') {
+            a1 = Math.floor(Math.random() * 3) + 1;
+            r = Math.floor(Math.random() * 3) + 1; // Pulos de 1 a 3
+        } else if (diff === 'hard') {
+            a1 = Math.floor(Math.random() * 20) + 10;
+            r = Math.floor(Math.random() * 8) + 5; // Pulos grandes
+        } else {
+            a1 = Math.floor(Math.random() * 10) + 1;
+            r = Math.floor(Math.random() * 4) + 2; 
+        }
         
         players[socket.id] = {
             id: socket.id,
@@ -58,9 +71,13 @@ io.on('connection', (socket) => {
             color: data.color || "#00ffcc",
             difficulty: diff,
             x: startX, y: startY, targetX: startX, targetY: startY,
-            score: 5, history: [], equation: eq, combo: 0, lastEatTime: 0
+            score: 5, history: [], combo: 0, lastEatTime: 0,
+            seq: { a1: a1, r: r, n: 4 } // A cobra começa procurando a 4ª posição da sequência
         };
-        spawnFood(eq.answer);
+        
+        // Gera o texto e a resposta inicial
+        updatePlayerEquation(players[socket.id]);
+        spawnFood(players[socket.id].equation.answer);
     });
 
     socket.on('mouseMove', (data) => {
@@ -93,21 +110,24 @@ setInterval(() => {
 
         if (now - p.lastEatTime > 6000 && p.combo > 0) p.combo = 0;
 
-        // Colisões entre cobras
+        // Colisão com outras cobras
         playersArray.forEach(other => {
             if (p.id === other.id) return;
             other.history.forEach((seg, idx) => {
                 if (idx < 10) return;
                 if (Math.sqrt(Math.pow(p.x - seg.x, 2) + Math.pow(p.y - seg.y, 2)) < 22) {
                     p.score = 5; p.combo = 0;
+                    p.seq.n = 4; // Se morrer, volta para a 4ª posição da sequência
                     p.x = Math.random() * WORLD_SIZE; p.y = Math.random() * WORLD_SIZE;
                     p.history = []; p.targetX = p.x; p.targetY = p.y;
+                    
+                    updatePlayerEquation(p);
                     io.to(p.id).emit('eatFail'); 
                 }
             });
         });
 
-        // Colisão com números
+        // Colisão com as bolinhas numéricas
         for (let i = foods.length - 1; i >= 0; i--) {
             const f = foods[i];
             if (Math.sqrt(Math.pow(p.x - f.x, 2) + Math.pow(p.y - f.y, 2)) < 30) {
@@ -115,13 +135,17 @@ setInterval(() => {
                     p.combo++;
                     p.lastEatTime = now;
                     
-                    let points = 1; // Easy
+                    let points = 1;
                     if (p.difficulty === 'medium') points = 2;
                     if (p.difficulty === 'hard') points = 4;
                     
                     p.score += points + Math.floor(p.combo / 3);
+                    
+                    // AVANÇA NA PROGRESSÃO ARITMÉTICA!
+                    p.seq.n++; 
+                    updatePlayerEquation(p);
+                    
                     io.to(p.id).emit('eatSuccess', { x: f.x, y: f.y, color: f.color, combo: p.combo });
-                    p.equation = generateEquation(p.difficulty); 
                     spawnFood(p.equation.answer);
                 } else { 
                     p.score = Math.max(5, p.score - 1); p.combo = 0;
