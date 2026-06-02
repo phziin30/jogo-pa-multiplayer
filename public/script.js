@@ -9,12 +9,10 @@ let camera = { x: 0, y: 0 };
 let gameStarted = false;
 let particles = [];
 let screenShake = 0;
-let currentCombo = 0;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// --- WEB AUDIO API (Sons Procedurais) ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playTone(freq, type, duration, vol) {
     if(audioCtx.state === 'suspended') audioCtx.resume();
@@ -48,10 +46,9 @@ document.getElementById('btn-play').addEventListener('click', () => {
 socket.on('gameState', (state) => { gameState = state; });
 
 socket.on('eatSuccess', (data) => {
-    currentCombo = data.combo;
     screenShake = Math.min(25, 10 + data.combo * 2);
     playTone(400 + (data.combo * 60), 'sine', 0.3, 0.4);
-    for(let i=0; i < 15; i++){
+    for(let i=0; i < 20; i++){
         particles.push({
             x: data.x, y: data.y, life: 1.0, color: data.color,
             vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15
@@ -59,10 +56,7 @@ socket.on('eatSuccess', (data) => {
     }
 });
 
-socket.on('eatFail', () => {
-    currentCombo = 0; screenShake = 20;
-    playTone(120, 'sawtooth', 0.4, 0.6);
-});
+socket.on('eatFail', () => { screenShake = 20; playTone(120, 'sawtooth', 0.4, 0.6); });
 
 const handleInput = (clientX, clientY) => {
     if (!gameStarted) return;
@@ -73,10 +67,16 @@ canvas.addEventListener('touchmove', (e) => {
     e.preventDefault(); handleInput(e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: false });
 
-function drawSphere(x, y, radius, color) {
+function drawSphere(x, y, radius, color, isLoot = false) {
+    if (isLoot) {
+        // Efeito de brilho externo para o Loot
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = color;
+    }
     const grad = ctx.createRadialGradient(x-radius*0.3, y-radius*0.3, radius*0.1, x, y, radius);
     grad.addColorStop(0, '#fff'); grad.addColorStop(0.4, color); grad.addColorStop(1, '#000');
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.fillStyle = grad; ctx.fill();
+    ctx.shadowBlur = 0; // Reseta o brilho
 }
 
 function draw() {
@@ -96,7 +96,7 @@ function draw() {
         document.getElementById('score').innerText = me.score;
     }
 
-    // Grid de Fundo
+    // Grid
     ctx.strokeStyle = '#111';
     const ox = ((camera.x % 60) + 60) % 60;
     const oy = ((camera.y % 60) + 60) % 60;
@@ -110,16 +110,24 @@ function draw() {
     // Comidas
     gameState.foods.forEach(f => {
         const sx = f.x - camera.x; const sy = f.y - camera.y;
-        if(sx > -50 && sx < canvas.width+50 && sy > -50 && sy < canvas.height+50) {
-            drawSphere(sx, sy, 12, f.color);
-            ctx.fillStyle = "white"; ctx.font = "bold 16px Arial"; ctx.fillText(f.value, sx + 20, sy - 10);
+        if(sx > -100 && sx < canvas.width+100 && sy > -100 && sy < canvas.height+100) {
+            // Se for loot, desenha GIGANTE (raio 40)
+            const radius = f.isLoot ? 40 : 12;
+            drawSphere(sx, sy, radius, f.color, f.isLoot);
+            ctx.fillStyle = "white"; 
+            ctx.font = f.isLoot ? "bold 24px Orbitron" : "bold 16px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(f.value, sx, sy + (f.isLoot ? 10 : -20));
+            if(f.isLoot) {
+                ctx.font = "12px Orbitron";
+                ctx.fillText("BÔNUS", sx, sy - 50);
+            }
         }
     });
 
     // Partículas
     for(let i = particles.length - 1; i >= 0; i--) {
-        let p = particles[i];
-        p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+        let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.03;
         if(p.life <= 0) { particles.splice(i, 1); continue; }
         ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
         ctx.beginPath(); ctx.arc(p.x - camera.x, p.y - camera.y, 4, 0, Math.PI*2); ctx.fill();
@@ -132,21 +140,12 @@ function draw() {
         p.history.forEach((seg, i) => { if (i % 4 === 0) drawSphere(seg.x-camera.x, seg.y-camera.y, 18, p.color); });
         const hx = p.x-camera.x; const hy = p.y-camera.y;
         drawSphere(hx, hy, 22, p.color);
-        
-        if (id === myId && p.combo > 1) {
-            ctx.fillStyle = "#ff00cc"; ctx.font = "bold 22px Orbitron"; ctx.textAlign="center";
-            ctx.fillText(`${p.combo}x COMBO!`, hx, hy - 70);
-        }
-
         ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "bold 15px Rajdhani";
         ctx.fillText(p.name, hx, hy - 40);
-        if(p.equation) { 
-            ctx.fillStyle = "#00ffcc"; ctx.font = "16px Orbitron";
-            ctx.fillText(p.equation.text, hx, hy + 50); 
-        }
+        if(p.equation) { ctx.fillStyle = "#00ffcc"; ctx.font = "16px Orbitron"; ctx.fillText(p.equation.text, hx, hy + 55); }
     }
 
-    // Atualiza Ranking Lateral
+    // Ranking
     const list = document.getElementById('leaderboard-list');
     list.innerHTML = '';
     Object.values(gameState.players).sort((a,b)=>b.score-a.score).slice(0,5).forEach(p => {
